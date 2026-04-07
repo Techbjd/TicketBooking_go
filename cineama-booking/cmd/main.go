@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -19,14 +20,20 @@ type moviesResponse struct {
 func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /movies", listMovies)
-	mux.Handle("GET/", http.FileServer(http.Dir("static")))
-	store:=booking.NewRedisStore(redis.NewClient("localhost:6379"))
-	svc:=booking.NewService(store)
+	mux.Handle("GET /", http.FileServer(http.Dir("static")))
+	store := booking.NewRedisStore(redis.NewClient("localhost:6379"))
+	svc := booking.NewService(store)
 	bookingHandler := booking.NewHandler(svc)
-	mux.HandleFunc("GET /movies/:movieID/seats", bookingHandler)
+	mux.HandleFunc("GET /movies/{movieID}/seats", bookingHandler.ListSeats)
+	mux.HandleFunc("POST /movies/{movieID}/seats/{seatsID}", bookingHandler.Hold)
+
+	mux.HandleFunc("PUT /session/{sessionID}/confirm", bookingHandler.ConfirmSession)
+	mux.HandleFunc("DELETE /session/{sessionID}", bookingHandler.ReleaseSession)
+
 	if err := http.ListenAndServe(":8080", mux); err != nil {
 		log.Fatal(err)
 	}
+	fmt.Println("The server is running on the port 8080")
 }
 
 var movies = []moviesResponse{
@@ -45,7 +52,6 @@ func listMovies(w http.ResponseWriter, r *http.Request) {
 func writeJSON(w http.ResponseWriter, status int, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
 	if err := json.NewEncoder(w).Encode(data); err != nil {
 		log.Printf("failed to write json response: %v", err)
 	}

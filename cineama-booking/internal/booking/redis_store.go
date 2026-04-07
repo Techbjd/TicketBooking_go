@@ -21,14 +21,14 @@ func NewRedisStore(rdb *redis.Client) *RedisStore {
 	return &RedisStore{rdb: rdb}
 }
 
-func (s *RedisStore) Book(b Booking) error {
+func (s *RedisStore) Book(b Booking) (Booking, error) {
 	session, err := s.hold(b)
 	if err != nil {
-		return err
+		return Booking{}, err
 	}
 
 	log.Printf("session booked %+v", session)
-	return nil
+	return session, nil
 }
 func parseSession(val string) (Booking, error) {
 	var data Booking
@@ -41,7 +41,7 @@ func parseSession(val string) (Booking, error) {
 		SeatID:    data.SeatID,
 		UserID:    data.UserID,
 		Status:    data.Status,
-		// ExpiresAt: data.ExpiresAt,
+		ExpiresAt: data.ExpiresAt,
 	}, nil
 
 }
@@ -99,4 +99,57 @@ func (s *RedisStore) ListBookings(MovieID string) []Booking {
 
 	}
 	return sessions
+}
+
+func (s *RedisStore) Confirm(ctx context.Context, sessionID, userID string) (Booking, error) {
+	pattern := "seat:*:*"
+	iter := s.rdb.Scan(ctx, 0, pattern, 0).Iterator()
+
+	for iter.Next(ctx) {
+		val, err := s.rdb.Get(ctx, iter.Val()).Result()
+		if err != nil {
+			continue
+		}
+
+		session, err := parseSession(val)
+		if err != nil {
+			continue
+		}
+
+		if session.ID == sessionID && session.UserID == userID {
+			session.Status = "confirmed"
+			updatedVal, err := json.Marshal(session)
+			if err != nil {
+				return Booking{}, err
+			}
+			s.rdb.Set(ctx, iter.Val(), updatedVal, -1)
+			return session, nil
+		}
+	}
+
+	return Booking{}, fmt.Errorf("session not found")
+}
+
+func (s *RedisStore) Release(ctx context.Context, sessionID, userID string) error {
+	pattern := "seat:*:*"
+	iter := s.rdb.Scan(ctx, 0, pattern, 0).Iterator()
+
+	for iter.Next(ctx) {
+		val, err := s.rdb.Get(ctx, iter.Val()).Result()
+		if err != nil {
+			continue
+		}
+
+		session, err := parseSession(val)
+		if err != nil {
+			continue
+		}
+
+		if session.ID == sessionID && session.UserID == userID {
+			s.rdb.Del(ctx, iter.Val())
+			return nil
+		}
+	}
+
+	return fmt.Errorf("session not found")
 }
