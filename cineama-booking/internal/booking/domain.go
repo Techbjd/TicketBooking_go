@@ -15,13 +15,14 @@ type Booking struct {
 	MovieID   string
 	SeatID    string
 	UserID    string
+	ShowTime  string
 	Status    string
 	ExpiresAt time.Time
 }
 
 type BookingStore interface {
 	Book(b Booking) (Booking, error)
-	ListBookings(MovieID string) []Booking
+	ListBookings(MovieID, showTime string) []Booking
 	Confirm(ctx context.Context, sessionID, userID string) (Booking, error)
 	Release(ctx context.Context, sessionID, userID string) error
 }

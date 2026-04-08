@@ -14,6 +14,6 @@ func NewClient(addr string) *goredis.Client {
 	if err := rdb.Ping(context.Background()).Err(); err != nil {
 		log.Fatalf("redis ping:%v", err)
 	}
-	log.Printf("connected to redis at %s", addr)
+	log.Printf("connected to redis at http://%s", addr)
 	return rdb
 }

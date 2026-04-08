@@ -40,6 +40,7 @@ func parseSession(val string) (Booking, error) {
 		MovieID:   data.MovieID,
 		SeatID:    data.SeatID,
 		UserID:    data.UserID,
+		ShowTime:  data.ShowTime,
 		Status:    data.Status,
 		ExpiresAt: data.ExpiresAt,
 	}, nil
@@ -50,7 +51,7 @@ func (s *RedisStore) hold(b Booking) (Booking, error) {
 	ctx := context.Background()
 	now := time.Now()
 
-	key := fmt.Sprintf("seat:%s:%s", b.MovieID, b.SeatID)
+	key := fmt.Sprintf("seat:%s:%s:%s", b.MovieID, b.ShowTime, b.SeatID)
 
 	// enrich booking
 	b.ID = uuid.New().String()
@@ -78,8 +79,8 @@ func (s *RedisStore) hold(b Booking) (Booking, error) {
 	return b, nil
 }
 
-func (s *RedisStore) ListBookings(MovieID string) []Booking {
-	pattern := fmt.Sprintf("seat:%s:*", MovieID)
+func (s *RedisStore) ListBookings(MovieID, showTime string) []Booking {
+	pattern := fmt.Sprintf("seat:%s:%s:*", MovieID, showTime)
 	var sessions []Booking
 	ctx := context.Background()
 	iter := s.rdb.Scan(ctx, 0, pattern, 0).Iterator()
